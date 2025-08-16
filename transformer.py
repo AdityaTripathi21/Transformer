@@ -110,6 +110,24 @@ class EncoderLayer(nn.Module):
         x = self.norm2(x + self.dropout(ff_output))
         return x
     
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff, dropout):
+        super().__init__()
+        self.self_attn = MultiHeadAttention(d_model, num_heads)
+        self.ff_sublayer = FeedForwardSublayer(d_model, d_ff)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    # mask - mask added for padded tokens because input can be variable length
+    def forward(self, x, tgt_mask): 
+        attn_output = self.self_attn(x, x, x, tgt_mask)
+        x = self.norm1(x + self.dropout(attn_output))
+        ff_output = self.ff_sublayer(x)
+        x = self.norm2(x + self.dropout(ff_output))
+        return x
+    
+
 class TransformerBody(nn.Module):
     def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff, dropout, max_seq_length):
         super().__init__()
@@ -126,6 +144,25 @@ class TransformerBody(nn.Module):
         for layer in self.layers:
             x = layer(x, mask)
         return x
+    
+class TransformerDecoder(nn.Module):
+    def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff, dropout, max_seq_length):
+        super(TransformerDecoder, self).__init__()
+        self.embedding = InputEmbedding(vocab_size, d_model)
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
+        self.layers = nn.ModuleList(
+            # list comprehension
+            [DecoderLayer(d_model, num_heads, d_ff, dropout) for layer in range(num_layers)]
+        )
+        self.fc = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x, mask):
+        x = self.embedding(x)
+        x = self.pos_encoding(x)
+        for layer in self.layers:
+            x = layer(x, mask)
+        x = self.fc(x)
+        return F.log_softmax(x, dim=-1)
     
 class ClassificationHead(nn.Module):
     # num_classes - number of possible classes
