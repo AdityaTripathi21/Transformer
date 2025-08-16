@@ -81,7 +81,7 @@ class MultiHeadAttention(nn.Module):
         return self.output_linear(output)
 
 
-class FeedForwardSublayer (nn.Module): 
+class FeedForwardSublayer(nn.Module): 
     def __init__(self, d_model, d_ff):
         super().__init__()
         self.net = nn.Sequential(
@@ -93,3 +93,55 @@ class FeedForwardSublayer (nn.Module):
     def forward(self, x):
         return self.net(x)
 
+class EncoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, d_ff, dropout):
+        super().__init__()
+        self.self_attn = MultiHeadAttention(d_model, num_heads)
+        self.ff_sublayer = FeedForwardSublayer(d_model, d_ff)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout = nn.Dropout(dropout)
+
+    # mask - mask added for padded tokens because input can be variable length
+    def forward(self, x, mask): 
+        attn_output = self.self_attn(x, x, x, mask)
+        x = self.norm1(x + self.dropout(attn_output))
+        ff_output = self.ff_sublayer(x)
+        x = self.norm2(x + self.dropout(ff_output))
+        return x
+    
+class TransformerBody(nn.Module):
+    def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff, dropout, max_seq_length):
+        super().__init__()
+        self.embedding = InputEmbedding(vocab_size, d_model)
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
+        self.layers = nn.ModuleList(
+            # list comprehension
+            [EncoderLayer(d_model, num_heads, d_ff, dropout) for layer in range(num_layers)]
+        )
+
+    def forward(self, x, mask):
+        x = self.embedding(x)
+        x = self.pos_encoding(x)
+        for layer in self.layers:
+            x = layer(x, mask)
+        return x
+    
+class ClassificationHead(nn.Module):
+    # num_classes - number of possible classes
+    def __init__(self, d_model, num_classes):
+        super().__init__()
+        self.fc = nn.Linear(d_model, num_classes)
+
+    def forward(self, x): 
+        logits = self.fc(x)
+        return F.log_softmax(logits, dim=-1)
+    
+class RegressionHead(nn.Module):
+    # num_classes - number of possible classes
+    def __init__(self, d_model, output_dim):
+        super().__init__()
+        self.fc = nn.Linear(d_model, output_dim)
+
+    def forward(self, x): 
+        return self.fc(x)
