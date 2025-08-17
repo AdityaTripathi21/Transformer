@@ -114,21 +114,25 @@ class DecoderLayer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff, dropout):
         super().__init__()
         self.self_attn = MultiHeadAttention(d_model, num_heads)
+        self.cross_attn = MultiHeadAttention(d_model, num_heads)
         self.ff_sublayer = FeedForwardSublayer(d_model, d_ff)
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
+        self.norm3 = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
 
     # mask - mask added for padded tokens because input can be variable length
-    def forward(self, x, tgt_mask): 
-        attn_output = self.self_attn(x, x, x, tgt_mask)
+    def forward(self, x, y, mask, cross_mask): 
+        attn_output = self.self_attn(x, x, x, mask)
         x = self.norm1(x + self.dropout(attn_output))
+        cross_attn_output = self.cross_attn(x, y, y, cross_mask)
+        x = self.norm2(x + self.dropout(cross_attn_output))
         ff_output = self.ff_sublayer(x)
-        x = self.norm2(x + self.dropout(ff_output))
+        x = self.norm3(x + self.dropout(ff_output))
         return x
     
 
-class TransformerBody(nn.Module):
+class TransformerEncoder(nn.Module):
     def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff, dropout, max_seq_length):
         super().__init__()
         self.embedding = InputEmbedding(vocab_size, d_model)
@@ -147,7 +151,7 @@ class TransformerBody(nn.Module):
     
 class TransformerDecoder(nn.Module):
     def __init__(self, vocab_size, d_model, num_layers, num_heads, d_ff, dropout, max_seq_length):
-        super(TransformerDecoder, self).__init__()
+        super().__init__()
         self.embedding = InputEmbedding(vocab_size, d_model)
         self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
         self.layers = nn.ModuleList(
@@ -156,11 +160,11 @@ class TransformerDecoder(nn.Module):
         )
         self.fc = nn.Linear(d_model, vocab_size)
 
-    def forward(self, x, mask):
+    def forward(self, x, mask, cross_mask):
         x = self.embedding(x)
         x = self.pos_encoding(x)
         for layer in self.layers:
-            x = layer(x, mask)
+            x = layer(x, mask, cross_mask)
         x = self.fc(x)
         return F.log_softmax(x, dim=-1)
     
@@ -182,3 +186,21 @@ class RegressionHead(nn.Module):
 
     def forward(self, x): 
         return self.fc(x)
+    
+
+class Transformer(nn.Module):
+    def __init__(self, vocab_size, d_model, num_heads, num_layers,
+                 d_ff, max_seq_len, dropout):
+        super().__init__()
+
+        self.encoder = TransformerEncoder(vocab_size, d_model, num_heads, num_layers,
+                                          d_ff, dropout, max_seq_len)
+
+        self.decoder = TransformerDecoder(vocab_size, d_model, num_heads, num_layers,
+                                          d_ff, dropout, max_seq_len)
+        
+    def forward(self, x, src_mask, mask, cross_mask):
+        encoder_output = self.encoder(x, src_mask)
+        decoder_output = self.decoder(x, encoder_output, mask, cross_mask)
+        return decoder_output
+
