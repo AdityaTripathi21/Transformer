@@ -1,4 +1,5 @@
 from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer
 
 # MSRP is a dataset that contains labels for whether sentence 2 is a paraphrase
 # for sentence 1, however, I want this to be a generation task, not a classification task,
@@ -38,10 +39,14 @@ class ParaphraseDataset(Dataset):
 data = load_training_data()
 dataset = ParaphraseDataset(data)
 
-dataloader = DataLoader(dataset=dataset, batch_size=4, shuffle=True)
+tokenizer = AutoTokenizer.from_pretrained("t5-small")
 
-for s1, s2 in dataloader:
-    print("Source:", s1)
-    print("Target:", s2)
-    break   # so you only print one batch
+def collate_fn(batch):
+    s1, s2 = zip(*batch)
+    inputs = tokenizer(list(s1), padding=True, truncation=True, return_tensors="pt")
+    labels = tokenizer(list(s2), padding=True, truncation=True, return_tensors="pt")["input_ids"]
+    inputs["labels"] = labels
+    return inputs
+
+dataloader = DataLoader(dataset=dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)
 
