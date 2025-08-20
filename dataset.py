@@ -1,5 +1,6 @@
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
+import torch 
 
 # MSRP is a dataset that contains labels for whether sentence 2 is a paraphrase
 # for sentence 1, however, I want this to be a generation task, not a classification task,
@@ -40,12 +41,33 @@ data = load_training_data()
 dataset = ParaphraseDataset(data)
 
 tokenizer = AutoTokenizer.from_pretrained("t5-small")
+tokenizer.add_special_tokens({
+    "bos_token": "<sos>",
+    "eos_token": "<eos>"
+})
 
+# tokenize input and also add padding and sos and eos and return dictionary
 def collate_fn(batch):
     s1, s2 = zip(*batch)
-    inputs = tokenizer(list(s1), padding=True, truncation=True, return_tensors="pt")
-    labels = tokenizer(list(s2), padding=True, truncation=True, return_tensors="pt")["input_ids"]
-    inputs["labels"] = labels
+    inputs = tokenizer(list(s1), padding=True, return_tensors="pt")
+
+    labels = []
+    for sent in s2:
+        tokens = tokenizer.encode(
+            sent,
+            add_special_tokens=False  
+        )
+
+        tokens = [tokenizer.bos_token_id] + tokens + [tokenizer.eos_token_id]
+
+        labels.append(tokens)
+
+    max_len = max(len(l) for l in labels)
+    labels = [
+    l + [tokenizer.pad_token_id] * (max_len - len(l)) for l in labels
+    ]
+
+    inputs["labels"] = torch.tensor(labels)
     return inputs
 
 dataloader = DataLoader(dataset=dataset, batch_size=4, shuffle=True, collate_fn=collate_fn)

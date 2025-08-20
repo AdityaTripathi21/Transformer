@@ -187,7 +187,7 @@ class RegressionHead(nn.Module):
 
     def forward(self, x): 
         return self.fc(x)
-    
+     
 
 class Transformer(nn.Module):
     def __init__(self, vocab_size, d_model, num_layers, num_heads,
@@ -201,7 +201,18 @@ class Transformer(nn.Module):
                                           d_ff, dropout, max_seq_len)
     
     # split x into src and tgt
-    def forward(self, src, tgt, src_mask, mask, cross_mask):
+    def forward(self, src, tgt, src_mask, tgt_mask, cross_mask):
         encoder_output = self.encoder(src, src_mask)
-        decoder_output = self.decoder(tgt, encoder_output, mask, cross_mask)
+        decoder_output = self.decoder(tgt, encoder_output, tgt_mask, cross_mask)
         return decoder_output
+    
+def pad_mask(seq, pad_id, target_len=None):
+    mask = (seq != pad_id).unsqueeze(1).unsqueeze(2)
+    if target_len is not None:
+        mask = mask.expand(-1, 1, target_len, -1)
+    return mask
+
+def causal_mask(seq_len):
+    mask = (1 - torch.triu(torch.ones(1, seq_len, seq_len), diagonal=1)).bool()
+    return mask.unsqueeze(1) 
+
