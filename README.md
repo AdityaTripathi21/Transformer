@@ -1,0 +1,1 @@
+I implemented the transformer architecture from the 2017 paper, Attention Is All You Need. This transformer uses an encoder-decoder architecture to generate paraphrased text using the Microsoft Paraphrase Corpus. Given a sentence, the model will generate a paraphrased version of that sentence.
