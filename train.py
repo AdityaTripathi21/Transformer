@@ -7,19 +7,19 @@ import torch.optim as optim
 # hyperparams
 vocab_size = len(tokenizer)
 d_model = 128
-num_layers = 2
+num_layers = 3
 num_heads = 4
 d_ff = 512
 max_seq_len = 128
 dropout = 0.1
 
-num_epochs = 10
+num_epochs = 25
 
 model = Transformer(vocab_size, d_model, num_layers, num_heads, d_ff, max_seq_len, dropout)
 # use CEL because multi-class classifcation
 criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
 
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
 for epoch in range(num_epochs):
     for batch in dataloader:

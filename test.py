@@ -5,7 +5,7 @@ from transformer import Transformer, pad_mask, causal_mask
 # Hyperparams - make sure they match training 
 vocab_size = len(tokenizer)
 d_model = 128
-num_layers = 2
+num_layers = 3
 num_heads = 4
 d_ff = 512
 max_seq_len = 128
@@ -50,4 +50,4 @@ def generate_text(prompt, max_len=20):
     return tokenizer.decode(tokens, skip_special_tokens=True)
 
 
-print(generate_text("The boy ran quickly", max_len=30))
+print(generate_text("Hello World!", max_len=30))
